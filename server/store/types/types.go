@@ -521,6 +521,12 @@ type User struct {
 	DeviceArray []*DeviceDef `json:"-" bson:"devices"`
 }
 
+type Coltest struct {
+	Id    int
+	Name  string
+	Parts string
+}
+
 // AccessMode is a definition of access mode bits.
 type AccessMode uint
 

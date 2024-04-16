@@ -8,11 +8,15 @@
 
 package main
 
-//go:generate protoc --go_out=../pbx --go_opt=paths=source_relative --go-grpc_out=../pbx --go-grpc_opt=paths=source_relative ../pbx/model.proto
-
 import (
 	"encoding/json"
 	"flag"
+	"github.com/tinode/chat/server/auth"
+	"github.com/tinode/chat/server/logs"
+	"github.com/tinode/chat/server/push"
+	"github.com/tinode/chat/server/store"
+	jcr "github.com/tinode/jsonco"
+	"google.golang.org/grpc"
 	"math/rand"
 	"net/http"
 	"os"
@@ -20,14 +24,13 @@ import (
 	"runtime/pprof"
 	"strings"
 	"time"
+)
 
+//go:generate protoc --go_out=../pbx --go_opt=paths=source_relative --go-grpc_out=../pbx --go-grpc_opt=paths=source_relative ../pbx/model.proto
+
+import (
 	gh "github.com/gorilla/handlers"
 
-	// For stripping comments from JSON config
-	jcr "github.com/tinode/jsonco"
-
-	// Authenticators
-	"github.com/tinode/chat/server/auth"
 	_ "github.com/tinode/chat/server/auth/anon"
 	_ "github.com/tinode/chat/server/auth/basic"
 	_ "github.com/tinode/chat/server/auth/code"
@@ -40,21 +43,13 @@ import (
 	_ "github.com/tinode/chat/server/db/postgres"
 	_ "github.com/tinode/chat/server/db/rethinkdb"
 
-	"github.com/tinode/chat/server/logs"
-
-	// Push notifications
-	"github.com/tinode/chat/server/push"
 	_ "github.com/tinode/chat/server/push/fcm"
 	_ "github.com/tinode/chat/server/push/stdout"
 	_ "github.com/tinode/chat/server/push/tnpg"
 
-	"github.com/tinode/chat/server/store"
-
 	// Credential validators
 	_ "github.com/tinode/chat/server/validate/email"
 	_ "github.com/tinode/chat/server/validate/tel"
-	"google.golang.org/grpc"
-
 	// File upload handlers
 	_ "github.com/tinode/chat/server/media/fs"
 	_ "github.com/tinode/chat/server/media/s3"
@@ -248,6 +243,9 @@ type configType struct {
 	// Could be blank: if TLS is not configured, will use ":80", otherwise ":443".
 	// Can be overridden from the command line, see option --listen.
 	Listen string `json:"listen"`
+
+	SysKey string `json:"syskey"`
+
 	// Base URL path where the streaming and large file API calls are served, default is '/'.
 	// Can be overridden from the command line, see option --api_path.
 	ApiPath string `json:"api_path"`
@@ -303,6 +301,8 @@ type configType struct {
 	Media     *mediaConfig                `json:"media"`
 	WebRTC    json.RawMessage             `json:"webrtc"`
 }
+
+var Mconfig configType
 
 func main() {
 	executable, _ := os.Executable()
@@ -734,7 +734,18 @@ func main() {
 		mux.HandleFunc("/", serve404)
 	}
 
+	// 处理相关api的问题
+	Mconfig = configType{
+		SysKey: config.SysKey,
+	}
+
+	mux.HandleFunc("/api/syslogin", syslogin)
+	mux.HandleFunc("/api/gettestlist", gettestlist)
+	mux.HandleFunc("/api/createtest", createtest)
+	mux.HandleFunc("/api/deletetest", deletetest)
+
 	if err = listenAndServe(config.Listen, mux, tlsConfig, signalHandler()); err != nil {
 		logs.Err.Fatal(err)
 	}
+
 }

@@ -1095,6 +1095,18 @@ func (pcacheMapper) Expire(keyPrefix string, olderThan time.Time) error {
 	return adp.PCacheExpire(keyPrefix, olderThan)
 }
 
+// by ssrs
+func GetColTest() ([]types.Coltest, error) {
+	return adp.GetColTest()
+}
+
+func Createtest(name string, parts string) error {
+	return adp.Createtest(name, parts)
+}
+func Deletetest(id int) error {
+	return adp.Deletetest(id)
+}
+
 func init() {
 	Store = storeObj{}
 	Users = usersMapper{}

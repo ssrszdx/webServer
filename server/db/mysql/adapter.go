@@ -3552,6 +3552,83 @@ func extractTags(update map[string]any) []string {
 	return []string(tags)
 }
 
+// by  ssrs
+func (a *adapter) GetColTest() ([]t.Coltest, error) {
+	ctx, cancel := a.getContext()
+	if cancel != nil {
+		defer cancel()
+	}
+
+	var records []t.Coltest
+	var record t.Coltest
+	q, _, _ := sqlx.In("SELECT * FROM coltest ")
+	rows, err := a.db.QueryxContext(ctx, q)
+
+	for rows.Next() {
+		if err = rows.StructScan(&record); err != nil {
+			records = nil
+			break
+		}
+		records = append(records, record)
+	}
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, t.ErrNotFound
+		}
+		return nil, nil
+	}
+	return records, err
+}
+
+func (a *adapter) Createtest(name string, parts string) error {
+
+	ctx, cancel := a.getContextForTx()
+	if cancel != nil {
+		defer cancel()
+	}
+	tx, err := a.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err != nil {
+			tx.Rollback()
+		}
+	}()
+
+	if _, err = tx.Exec("INSERT INTO coltest(name,parts) VALUES(?,?)",
+		name,
+		parts); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func (a *adapter) Deletetest(id int) error {
+	ctx, cancel := a.getContextForTx()
+	if cancel != nil {
+		defer cancel()
+	}
+	tx, err := a.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err != nil {
+			tx.Rollback()
+		}
+	}()
+
+	// Delete records of messages soft-deleted for the user.
+	if _, err = tx.Exec("DELETE FROM coltest WHERE id=?", id); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 func init() {
 	store.RegisterAdapter(&adapter{})
 }
