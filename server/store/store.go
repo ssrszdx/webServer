@@ -1100,11 +1100,20 @@ func GetColTest() ([]types.Coltest, error) {
 	return adp.GetColTest()
 }
 
-func Createtest(name string, parts string) error {
-	return adp.Createtest(name, parts)
+func Createtest(name string, parts string, timestr string) (string, error) {
+	return adp.Createtest(name, parts, timestr)
 }
 func Deletetest(id int) error {
 	return adp.Deletetest(id)
+}
+func Userlogin(userobj types.UserExt) error {
+	return adp.Userlogin(userobj)
+}
+func Updatetest(testobj types.Coltest) error {
+	return adp.Updatetest(testobj)
+}
+func GetGroupInfo(clientid string, testid string) ([]types.UserExt, error) {
+	return adp.GetGroupInfo(clientid, testid)
 }
 
 func init() {

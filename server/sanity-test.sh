@@ -1,7 +1,7 @@
 #!/bin/bash
 
-BINARY_PATH=$GOPATH/bin
-TINODE_BINARY=$BINARY_PATH/server
+BINARY_PATH=GOPATH/bin
+TINODE_BINARY=BINARY_PATH/server
 
 # Kills and removes any running containers.
 cleanup() {
@@ -16,7 +16,7 @@ cleanup() {
 fail() {
   cleanup
   echo "**************************************************"
-  printf "Tests Failed: ${@}\n"
+  printf "Tests Failed: {@}\n"
   echo "**************************************************"
   exit 1
 }
@@ -56,17 +56,17 @@ build() {
   go install -tags mysql -ldflags "-X main.buildstamp=`date -u '+%Y%m%dT%H:%M:%SZ'`" \
     github.com/tinode/chat/tinode-db \
     github.com/tinode/chat/server && \
-  ln -s $TINODE_BINARY
+  ln -s TINODE_BINARY
 }
 
 # Initializes Tinode database.
 init-db() {
-  $GOPATH/bin/tinode-db -config=./tinode.conf -data=../tinode-db/data.json
+  GOPATH/bin/tinode-db -config=./tinode.conf -data=../tinode-db/data.json
 }
 
 wait-for() {
-  local port=$1
-  while ! nc -z localhost $port; do
+  local port=1
+  while ! nc -z localhost port; do
     sleep 1
   done
 }
@@ -78,8 +78,8 @@ run-server() {
 
 send-requests() {
   local expect=12
-  local port=$1
-  local id=$2
+  local port=1
+  local id=2
   local outfile=$(mktemp /tmp/tinode-${id}.txt)
   pushd .
   cd ../tn-cli

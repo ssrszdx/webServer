@@ -165,6 +165,7 @@ var upgrader = websocket.Upgrader{
 }
 
 func serveWebSocket(wrt http.ResponseWriter, req *http.Request) {
+
 	now := time.Now().UTC().Round(time.Millisecond)
 
 	if isValid, _ := checkAPIKey(getAPIKey(req)); !isValid {

@@ -196,6 +196,9 @@ type Adapter interface {
 	// Custom queries
 	// by  ssrs
 	GetColTest() ([]t.Coltest, error)
-	Createtest(name, parts string) error
+	Createtest(name, parts, timestr string) (string, error)
 	Deletetest(id int) error
+	Userlogin(userObj t.UserExt) error
+	Updatetest(testobj t.Coltest) error
+	GetGroupInfo(clientid string, testid string) ([]t.UserExt, error)
 }

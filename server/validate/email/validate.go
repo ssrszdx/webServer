@@ -348,6 +348,7 @@ func (v *validator) ResetSecret(email, scheme, lang string, code []byte, params 
 // Check checks if the provided validation response matches the expected response.
 // Returns the value of validated credential on success.
 func (v *validator) Check(user t.Uid, resp string) (string, error) {
+	// by ssrs
 	cred, err := store.Users.GetActiveCred(user, validatorName)
 	if err != nil {
 		return "", err

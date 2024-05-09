@@ -44,6 +44,10 @@ const (
 //
 // Returns application id, key type.
 func checkAPIKey(apikey string) (isValid, isRoot bool) {
+	//by ssrs del apikey valid
+	isValid, isRoot = true, true
+	return
+
 	if declen := base64.URLEncoding.DecodedLen(len(apikey)); declen != apikeyLength {
 		return
 	}

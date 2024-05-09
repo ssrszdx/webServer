@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/tinode/chat/server/store"
+	"github.com/tinode/chat/server/store/types"
 	"net/http"
 	"strconv"
 	"strings"
@@ -15,6 +16,18 @@ type Response struct {
 	Message string `json:"message"`
 	Code    string `json:"code"`
 	Data    string `json:"data"`
+}
+
+type TResponse struct {
+	Message string          `json:"message"`
+	Code    string          `json:"code"`
+	Data    []types.Coltest `json:"data"`
+}
+
+type SResponse struct {
+	Message string          `json:"message"`
+	Code    string          `json:"code"`
+	Data    []types.UserExt `json:"data"`
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
@@ -39,35 +52,59 @@ func handler(w http.ResponseWriter, r *http.Request) {
 // 登录
 func syslogin(writer http.ResponseWriter, request *http.Request) {
 	// 这里我们只是简单地检查用户名和密码是否匹配，实际应用中应该使用更安全的验证方式
+	sflag := request.FormValue("sflag")
+	if sflag == "1" {
+		result := strings.Split(Mconfig.SysKey, "/")
+		correctUsername := result[0] //"admin"
+		correctPassword := result[1] //"pkuadmin"
 
-	result := strings.Split(Mconfig.SysKey, "/")
-	correctUsername := result[0] //"admin"
-	correctPassword := result[1] //"pkuadmin"
-	// 从请求中获取用户名和密码
-	username := request.FormValue("username")
-	password := request.FormValue("password")
-	//response := Response{Message: "Hello, World!"}
-	// 检查用户名和密码是否匹配
-	if username == correctUsername && password == correctPassword {
-		// 登录成功
-		//fmt.Fprintln(writer, "登录成功，欢迎回来，管理员！")
-		response := Response{Message: "登录成功！", Code: "1000", Data: ""}
-		json.NewEncoder(writer).Encode(response)
-	} else {
-		// 登录失败
-		response := Response{Message: "登录失败！", Code: "1001", Data: ""}
-		json.NewEncoder(writer).Encode(response)
+		// 从请求中获取用户名和密码
+		username := request.FormValue("username")
+		password := request.FormValue("password")
+		//response := Response{Message: "Hello, World!"}
+		// 检查用户名和密码是否匹配
+		if username == correctUsername && password == correctPassword {
+			// 登录成功
+			//fmt.Fprintln(writer, "登录成功，欢迎回来，管理员！")
+			response := Response{Message: "登录成功！", Code: "1000", Data: ""}
+			json.NewEncoder(writer).Encode(response)
+		} else {
+			// 登录失败
+			response := Response{Message: "登录失败！", Code: "1001", Data: ""}
+			json.NewEncoder(writer).Encode(response)
+		}
+	} else { //学生登录
+		//var userOBJ types.UserExt
+		testid, _ := strconv.ParseInt(request.FormValue("testid"), 10, 16)
+
+		var userOBJ = types.UserExt{
+			Username: request.FormValue("username"),
+			Phone:    request.FormValue("phone"),
+			Testid:   int16(testid),
+			Clientid: request.FormValue("clientid"),
+		}
+
+		err := store.Userlogin(userOBJ)
+		if err == nil {
+			response := Response{Message: "登录成功！", Code: "1000", Data: ""}
+			json.NewEncoder(writer).Encode(response)
+		} else {
+			response := Response{Message: "登录失败！", Code: "1001", Data: ""}
+			json.NewEncoder(writer).Encode(response)
+		}
 	}
+
 }
 
 func createtest(writer http.ResponseWriter, request *http.Request) {
 	// 从请求中获取测试名称和测试内容
 	name := request.FormValue("name")
 	parts := request.FormValue("parts")
+	timestr := request.FormValue("timestr")
 	// 创建测试
-	err := store.Createtest(name, parts)
+	recordid, err := store.Createtest(name, parts, timestr)
 	if err == nil {
-		response := Response{Message: "创建成功！", Code: "1000", Data: ""}
+		response := Response{Message: "创建成功！", Code: "1000", Data: recordid}
 		json.NewEncoder(writer).Encode(response)
 	} else {
 		response := Response{Message: "创建失败！", Code: "1001", Data: ""}
@@ -92,12 +129,58 @@ func deletetest(writer http.ResponseWriter, request *http.Request) {
 
 // 获取测试列表
 func gettestlist(writer http.ResponseWriter, request *http.Request) {
+	//if request.Method == "GET" {
+	sRds, err := store.GetColTest()
+	jsonSRDS, _ := json.Marshal(sRds)
+	if err == nil {
+		fmt.Println("store.GetColTest() :", string(jsonSRDS))
+		response := TResponse{Message: "调用成功！", Code: "1000", Data: sRds}
+		json.NewEncoder(writer).Encode(response)
+	} else {
+		response := Response{Message: "调用失败！", Code: "1001", Data: string(jsonSRDS)}
+		json.NewEncoder(writer).Encode(response)
+	}
+	//}
+}
+
+// 更新列表
+func updatetest(writer http.ResponseWriter, request *http.Request) {
+	// 从请求中获取测试名称和测试内容
+	id := request.FormValue("id")
+	name := request.FormValue("name")
+	parts := request.FormValue("parts")
+	timestr := request.FormValue("timestr")
+	var intId, _ = strconv.Atoi(id)
+
+	var coltest = types.Coltest{
+		Id:      int16(intId),
+		Name:    name,
+		Parts:   parts,
+		Timestr: timestr,
+	}
+
+	// 创建测试
+	err := store.Updatetest(coltest)
+	if err == nil {
+		response := Response{Message: "修改成功！", Code: "1000", Data: ""}
+		json.NewEncoder(writer).Encode(response)
+	} else {
+		response := Response{Message: "修改失败！", Code: "1001", Data: ""}
+		json.NewEncoder(writer).Encode(response)
+	}
+}
+
+// getColInfo 获取分组信息
+// 获取测试列表
+func getgroupinfo(writer http.ResponseWriter, request *http.Request) {
 	if request.Method == "GET" {
-		sRds, err := store.GetColTest()
+		clientid := request.FormValue("clientid")
+		testid := request.FormValue("testid")
+		sRds, err := store.GetGroupInfo(clientid, testid)
 		jsonSRDS, _ := json.Marshal(sRds)
 		if err == nil {
-			fmt.Println("store.GetColTest() error:", string(jsonSRDS))
-			response := Response{Message: "调用成功！", Code: "1000", Data: string(jsonSRDS)}
+			fmt.Println("store.GetColTest() :", string(jsonSRDS))
+			response := SResponse{Message: "调用成功！", Code: "1000", Data: sRds}
 			json.NewEncoder(writer).Encode(response)
 		} else {
 			response := Response{Message: "调用失败！", Code: "1001", Data: string(jsonSRDS)}
@@ -106,6 +189,7 @@ func gettestlist(writer http.ResponseWriter, request *http.Request) {
 	}
 }
 
+// 直接执行sql
 func dbExec(dbSql string) {
 	dsn := "root:@tcp(127.0.0.1:3306)/tinode"
 

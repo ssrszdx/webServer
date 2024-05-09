@@ -305,6 +305,9 @@ type configType struct {
 var Mconfig configType
 
 func main() {
+
+	//genSecret2()
+
 	executable, _ := os.Executable()
 
 	logFlags := flag.String("log_flags", "stdFlags",
@@ -743,6 +746,8 @@ func main() {
 	mux.HandleFunc("/api/gettestlist", gettestlist)
 	mux.HandleFunc("/api/createtest", createtest)
 	mux.HandleFunc("/api/deletetest", deletetest)
+	mux.HandleFunc("/api/updatetest", updatetest)
+	mux.HandleFunc("/api/getgroupinfo", getgroupinfo)
 
 	if err = listenAndServe(config.Listen, mux, tlsConfig, signalHandler()); err != nil {
 		logs.Err.Fatal(err)

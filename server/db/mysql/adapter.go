@@ -3124,6 +3124,7 @@ func (a *adapter) CredGetActive(uid t.Uid, method string) (*t.Credential, error)
 	err := a.db.GetContext(ctx, &cred, "SELECT createdat,updatedat,method,value,resp,done,retries "+
 		"FROM credentials WHERE userid=? AND deletedat IS NULL AND method=? AND done=false",
 		store.DecodeUid(uid), method)
+
 	if err != nil {
 		if err == sql.ErrNoRows {
 			err = nil
@@ -3552,7 +3553,7 @@ func extractTags(update map[string]any) []string {
 	return []string(tags)
 }
 
-// by  ssrs
+// by  ssrs at pku
 func (a *adapter) GetColTest() ([]t.Coltest, error) {
 	ctx, cancel := a.getContext()
 	if cancel != nil {
@@ -3561,8 +3562,15 @@ func (a *adapter) GetColTest() ([]t.Coltest, error) {
 
 	var records []t.Coltest
 	var record t.Coltest
-	q, _, _ := sqlx.In("SELECT * FROM coltest ")
+	q, _, _ := sqlx.In("SELECT id,name,parts,timestr FROM coltest ")
 	rows, err := a.db.QueryxContext(ctx, q)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, t.ErrNotFound
+		}
+		return nil, nil
+	}
 
 	for rows.Next() {
 		if err = rows.StructScan(&record); err != nil {
@@ -3572,16 +3580,10 @@ func (a *adapter) GetColTest() ([]t.Coltest, error) {
 		records = append(records, record)
 	}
 
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, t.ErrNotFound
-		}
-		return nil, nil
-	}
 	return records, err
 }
 
-func (a *adapter) Createtest(name string, parts string) error {
+func (a *adapter) Createtest(name string, parts string, timestr string) (string, error) {
 
 	ctx, cancel := a.getContextForTx()
 	if cancel != nil {
@@ -3589,7 +3591,7 @@ func (a *adapter) Createtest(name string, parts string) error {
 	}
 	tx, err := a.db.BeginTxx(ctx, nil)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	defer func() {
@@ -3597,13 +3599,22 @@ func (a *adapter) Createtest(name string, parts string) error {
 			tx.Rollback()
 		}
 	}()
-
-	if _, err = tx.Exec("INSERT INTO coltest(name,parts) VALUES(?,?)",
-		name,
-		parts); err != nil {
-		return err
+	//插入一场测试
+	result, err := tx.Exec("INSERT INTO coltest(name,parts,timestr) VALUES(?,?,?)", name, parts, timestr)
+	if err != nil {
+		return "", err
 	}
-	return tx.Commit()
+
+	lastInsertID, err := result.LastInsertId()
+	if err != nil {
+		return "", err
+	}
+	//每创建一次测试，所有的分组状态初始话
+	if _, err = tx.Exec("update colgroups set state=0 where 1=1"); err != nil {
+		return "", err
+	}
+
+	return strconv.Itoa(int(lastInsertID)), tx.Commit()
 }
 
 func (a *adapter) Deletetest(id int) error {
@@ -3625,6 +3636,126 @@ func (a *adapter) Deletetest(id int) error {
 	// Delete records of messages soft-deleted for the user.
 	if _, err = tx.Exec("DELETE FROM coltest WHERE id=?", id); err != nil {
 		return err
+	}
+	return tx.Commit()
+}
+
+func (a *adapter) Updatetest(coltest t.Coltest) error {
+	ctx, cancel := a.getContextForTx()
+	if cancel != nil {
+		defer cancel()
+	}
+	tx, err := a.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err != nil {
+			tx.Rollback()
+		}
+	}()
+
+	// Delete records of messages soft-deleted for the user.
+	if _, err = tx.Exec("update coltest set timestr=? WHERE id=?", coltest.Timestr, coltest.Id); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func (a *adapter) GetGroupInfo(clientid string, testid string) ([]t.UserExt, error) {
+	//ctx, cancel := a.getContext()
+	//if cancel != nil {
+	//	defer cancel()
+	//}
+
+	var records []t.UserExt
+	var record t.UserExt
+
+	rows, err := a.db.Query("SELECT c2.id as groupid,c1.username as username,c2.groupname as groupname FROM colusers c1 right join colgroups c2 on c1.groupid=c2.id where c2.state=0 order by c2.id  limit 0,1")
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, t.ErrNotFound
+		}
+	}
+	for rows.Next() {
+		if err = rows.Scan(&record.Groupid, &record.Username, &record.Groupname); err != nil {
+			records = nil
+			break
+		}
+		records = append(records, record)
+	}
+	//更新group分组状态
+	if _, err = a.db.Exec("update colgroups set state=1 where state=0 and id=? ", records[0].Groupid); err != nil {
+		return nil, err
+	}
+	return records, err
+}
+
+func (a *adapter) GetGroupInfo2(clientid string, testid string) ([]t.UserExt, error) {
+	//ctx, cancel := a.getContext()
+	//if cancel != nil {
+	//	defer cancel()
+	//}
+
+	var records []t.UserExt
+	var record t.UserExt
+
+	rows, err := a.db.Query("SELECT userid,username,groupid FROM colusers where testid=?", testid)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, t.ErrNotFound
+		}
+	}
+	for rows.Next() {
+		if err = rows.Scan(&record.Userid, &record.Username, &record.Groupid); err != nil {
+			records = nil
+			break
+		}
+		records = append(records, record)
+	}
+
+	return records, err
+}
+
+// 先查一下有没有这个用户
+func (a *adapter) Userlogin(userobj t.UserExt) error {
+
+	ctx, cancel := a.getContextForTx()
+	if cancel != nil {
+		defer cancel()
+	}
+	tx, err := a.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			tx.Rollback()
+		}
+	}()
+	//登录的时候如果已经有了,就不用管了,直接返回err空。
+
+	var groupid string
+	if err := a.db.GetContext(ctx, &groupid, "select groupid  from colgroups where state=0 order by groupid  limit 0,1"); err != nil {
+		return err
+	}
+	var isexist string
+
+	err = a.db.GetContext(ctx, &isexist, "select 1 from colusers where clientid=? and testid=?", userobj.Clientid, userobj.Testid)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			_, err := tx.Exec("INSERT INTO colusers(groupid,testid,phone,username,clientid) VALUES(?,?,?,?,?)", groupid, userobj.Testid, userobj.Phone, userobj.Username, userobj.Clientid)
+			if err != nil {
+				return err
+			}
+			//更新group分组状态
+			if _, err = a.db.Exec("update colgroups set state=1 where state=0 and groupid=? order by id limit 1 ", groupid); err != nil {
+				return err
+			}
+		}
 	}
 	return tx.Commit()
 }

@@ -522,9 +522,21 @@ type User struct {
 }
 
 type Coltest struct {
-	Id    int
-	Name  string
-	Parts string
+	Id      int16
+	Name    string
+	Parts   string
+	Timestr string
+}
+
+type UserExt struct {
+	Userid    int16
+	Groupid   string
+	Testid    int16
+	Phone     string
+	Username  string
+	Clientid  string
+	Groupname string
+	Pwd       string
 }
 
 // AccessMode is a definition of access mode bits.

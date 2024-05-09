@@ -23,6 +23,6 @@ while read line; do
     exec 3>&1
   fi
 
-  echo "{\"schema\": \"basic\", \"secret\": \"${parts[1]}:${parts[3]}\", \"user\": \"${parts[2]}\"}" 1>&3
+  echo "{\"schema\": \"basic\", \"secret\": \"{parts[1]}:{parts[3]}\", \"user\": \"{parts[2]}\"}" 1>&3
   break
 done < /dev/stdin
